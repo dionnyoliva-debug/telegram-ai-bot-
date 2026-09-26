@@ -5,8 +5,11 @@ Responde a todo lo que le escribas usando un modelo de IA gratuito.
 import asyncio
 import logging
 import os
+import sys
+from threading import Thread
 
 import requests
+from flask import Flask
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -31,6 +34,24 @@ historial = {}
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
 )
+
+
+# --- Servidor keep-alive (para que Replit no apague el bot) ---
+keep_app = Flask("")
+
+
+@keep_app.route("/")
+def home():
+    return "Bot activo"
+
+
+def keep_alive():
+    """Levanta un mini servidor web en segundo plano."""
+    port = int(os.environ.get("PORT", 8080))
+    Thread(
+        target=lambda: keep_app.run(host="0.0.0.0", port=port),
+        daemon=True,
+    ).start()
 
 
 def obtener_historial(chat_id: int):
@@ -93,16 +114,25 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
+    global TOKEN
     if not TOKEN:
-        raise RuntimeError(
-            "Falta la variable de entorno TELEGRAM_TOKEN. "
-            "Configúrala en el hosting con el token que te dio @BotFather."
-        )
+        if sys.stdin.isatty():
+            # Solo en el teléfono: pedir el token por teclado
+            TOKEN = input("Pega el token que te dio @BotFather: ").strip()
+        else:
+            # En un servidor no hay teclado: el token debe venir como variable
+            raise RuntimeError(
+                "Falta la variable de entorno TELEGRAM_TOKEN. "
+                "Configúrala en Railway con el token de @BotFather."
+            )
+    if not TOKEN:
+        raise RuntimeError("Necesitas el token de @BotFather para arrancar el bot.")
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("clear", clear))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
     logging.info("Bot iniciado. Esperando mensajes...")
+    keep_alive()  # mini servidor para mantener el bot despierto en Replit
     app.run_polling()
 
 
