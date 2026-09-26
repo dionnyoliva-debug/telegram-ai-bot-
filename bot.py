@@ -19,12 +19,12 @@ from telegram.ext import (
     filters,
 )
 
-# --- ConfiguraciÃ³n ---
-TOKEN = os.environ.get("TELEGRAM_TOKEN")  # se configura en el hosting, no aquÃ­
+# --- Configuración ---
+TOKEN = os.environ.get("TELEGRAM_TOKEN")  # se configura en el hosting, no aquí
 API_URL = "https://text.pollinations.ai/openai"  # API de IA gratuita, sin key
 SYSTEM_PROMPT = (
-    "Eres un asistente virtual amable, Ãºtil y directo. "
-    "Respondes siempre en espaÃ±ol neutro, de forma clara y sin rodeos."
+    "Eres un asistente virtual amable, útil y directo. "
+    "Respondes siempre en español neutro, de forma clara y sin rodeos."
 )
 MAX_HISTORY = 10  # cantidad de mensajes que recuerda por usuario
 
@@ -62,11 +62,11 @@ def obtener_historial(chat_id: int):
 
 
 def preguntar_ia(chat_id: int, texto_usuario: str) -> str:
-    """EnvÃ­a el mensaje a la IA junto con el historial y devuelve la respuesta."""
+    """Envía el mensaje a la IA junto con el historial y devuelve la respuesta."""
     mensajes = obtener_historial(chat_id)
     mensajes.append({"role": "user", "content": texto_usuario})
 
-    # Recortar historial para no exceder el lÃ­mite
+    # Recortar historial para no exceder el límite
     if len(mensajes) > MAX_HISTORY + 1:
         mensajes = [mensajes[0]] + mensajes[-MAX_HISTORY:]
         historial[chat_id] = mensajes
@@ -85,10 +85,10 @@ def preguntar_ia(chat_id: int, texto_usuario: str) -> str:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Â¡Hola! Soy tu asistente IA. EscrÃ­beme lo que quieras y te respondo.\n\n"
+        "¡Hola! Soy tu asistente IA. Escríbeme lo que quieras y te respondo.\n\n"
         "Comandos:\n"
         "/start - mostrar este mensaje\n"
-        "/clear - borrar la conversaciÃ³n y empezar de cero"
+        "/clear - borrar la conversación y empezar de cero"
     )
 
 
@@ -96,7 +96,7 @@ async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
     historial[update.effective_chat.id] = [
         {"role": "system", "content": SYSTEM_PROMPT}
     ]
-    await update.message.reply_text("ConversaciÃ³n borrada. Empezamos de cero.")
+    await update.message.reply_text("Conversación borrada. Empezamos de cero.")
 
 
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -108,7 +108,9 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logging.error("Error al consultar la IA: %s", e)
         respuesta = (
-            "Tuve un problema al responder. Espera un momento e intÃ©ntalo de nuevo."
+            "Tuve un problema al responder. "
+            "Espera un momento e inténtalo de nuevo.\n"
+            f"(Detalle técnico: {e})"
         )
     await update.message.reply_text(respuesta)
 
@@ -117,13 +119,13 @@ def main():
     global TOKEN
     if not TOKEN:
         if sys.stdin.isatty():
-            # Solo en el telÃ©fono: pedir el token por teclado
+            # Solo en el teléfono: pedir el token por teclado
             TOKEN = input("Pega el token que te dio @BotFather: ").strip()
         else:
             # En un servidor no hay teclado: el token debe venir como variable
             raise RuntimeError(
                 "Falta la variable de entorno TELEGRAM_TOKEN. "
-                "ConfigÃºrala en tu hosting con el token de @BotFather."
+                "Configúrala en tu hosting con el token de @BotFather."
             )
     if not TOKEN:
         raise RuntimeError("Necesitas el token de @BotFather para arrancar el bot.")
