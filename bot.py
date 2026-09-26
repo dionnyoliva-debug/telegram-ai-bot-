@@ -22,7 +22,9 @@ from telegram.ext import (
 
 # --- Configuración ---
 TOKEN = os.environ.get("TELEGRAM_TOKEN")  # se configura en el hosting, no aquí
-API_URL = "https://text.pollinations.ai/openai"  # API de IA gratuita, sin key
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")  # token de GitHub Models (gratis)
+AI_URL = "https://models.github.ai/inference/chat/completions"
+AI_MODEL = "openai/gpt-4o-mini"  # modelo rápido y con buen límite gratuito
 SYSTEM_PROMPT = (
     "Eres un asistente virtual amable, útil y directo. "
     "Respondes siempre en español neutro, de forma clara y sin rodeos."
@@ -64,6 +66,10 @@ def obtener_historial(chat_id: int):
 
 def preguntar_ia(chat_id: int, texto_usuario: str) -> str:
     """Envía el mensaje a la IA junto con el historial y devuelve la respuesta."""
+    if not GITHUB_TOKEN:
+        raise RuntimeError(
+            "Falta la variable GITHUB_TOKEN. Créala en GitHub y configúrala en el hosting."
+        )
     mensajes = obtener_historial(chat_id)
     mensajes.append({"role": "user", "content": texto_usuario})
 
@@ -72,13 +78,17 @@ def preguntar_ia(chat_id: int, texto_usuario: str) -> str:
         mensajes = [mensajes[0]] + mensajes[-MAX_HISTORY:]
         historial[chat_id] = mensajes
 
-    # Reintentar hasta 3 veces: el servicio gratuito a veces falla de forma intermitente
+    # Reintentar hasta 3 veces ante fallos intermitentes
     ultimo_error = None
     for intento in range(3):
         try:
             resp = requests.post(
-                API_URL,
-                json={"model": "openai", "messages": mensajes},
+                AI_URL,
+                headers={
+                    "Authorization": f"Bearer {GITHUB_TOKEN}",
+                    "Content-Type": "application/json",
+                },
+                json={"model": AI_MODEL, "messages": mensajes},
                 timeout=90,
             )
             resp.raise_for_status()
@@ -117,9 +127,7 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logging.error("Error al consultar la IA: %s", e)
         respuesta = (
-            "Tuve un problema al responder. "
-            "Espera un momento e inténtalo de nuevo.\n"
-            f"(Detalle técnico: {e})"
+            "Tuve un problema al responder. Espera un momento e inténtalo de nuevo."
         )
     await update.message.reply_text(respuesta)
 
