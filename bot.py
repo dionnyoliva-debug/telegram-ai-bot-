@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import sys
+import time
 from threading import Thread
 
 import requests
@@ -71,16 +72,24 @@ def preguntar_ia(chat_id: int, texto_usuario: str) -> str:
         mensajes = [mensajes[0]] + mensajes[-MAX_HISTORY:]
         historial[chat_id] = mensajes
 
-    resp = requests.post(
-        API_URL,
-        json={"model": "openai", "messages": mensajes},
-        timeout=90,
-    )
-    resp.raise_for_status()
-    respuesta = resp.json()["choices"][0]["message"]["content"]
-
-    mensajes.append({"role": "assistant", "content": respuesta})
-    return respuesta
+    # Reintentar hasta 3 veces: el servicio gratuito a veces falla de forma intermitente
+    ultimo_error = None
+    for intento in range(3):
+        try:
+            resp = requests.post(
+                API_URL,
+                json={"model": "openai", "messages": mensajes},
+                timeout=90,
+            )
+            resp.raise_for_status()
+            respuesta = resp.json()["choices"][0]["message"]["content"]
+            mensajes.append({"role": "assistant", "content": respuesta})
+            return respuesta
+        except Exception as e:
+            ultimo_error = e
+            logging.warning("Intento %d fallido al consultar la IA: %s", intento + 1, e)
+            time.sleep(3)
+    raise ultimo_error
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
